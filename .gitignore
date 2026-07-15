@@ -1,0 +1,14 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python virtual environments
+langgraph_env2/
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Local runtime artifacts
+.dist/
+*.log
