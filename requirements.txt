@@ -1,0 +1,8 @@
+streamlit>=1.20
+requests
+python-dotenv
+tavily-python
+psycopg[binary]
+langgraph
+langchain-core
+langchain-groq

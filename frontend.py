@@ -498,7 +498,18 @@ import os
 import streamlit as st
 from datetime import datetime
 from langchain_core.messages import HumanMessage
-from main import app
+
+# Demo mode guard: if `DEMO_MODE` is truthy we avoid importing `main`
+# because `main` requires a configured `DATABASE_URL` and external LLMs.
+DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() in ("1", "true", "yes")
+app = None
+_import_error = None
+if not DEMO_MODE:
+    try:
+        from main import app as app
+    except Exception as e:
+        # Keep going in a degraded mode; frontend will show a warning.
+        _import_error = e
 
 st.set_page_config(
     page_title="AI Travel Booking System",
@@ -953,44 +964,76 @@ if generate:
         st.markdown("---")
         st.markdown("<h3 style='margin-bottom:1rem;'>🤖 Active Multi-Agent Pipeline Execution</h3>", unsafe_allow_html=True)
 
-        for chunk in app.stream(
-            {
-                "messages": [HumanMessage(content=user_query)],
-                "user_query": user_query,
-                "flight_results": "",
-                "hotel_results": "",
-                "itinerary": "",
-                "llm_calls": 0,
-            },
-            config=config,
-            stream_mode="updates",
-        ):
-            for node_name, state_update in chunk.items():
-                icon, label = AGENT_META.get(node_name, ("🔧", node_name))
+        if DEMO_MODE or app is None:
+            if _import_error is not None:
+                st.warning(f"Running in demo mode because importing the backend failed: {_import_error}")
 
+            # Simple canned/demo outputs so UI can be verified without external services
+            collected["flight_results"] = (
+                "1. Airline: DemoAir\n   Departure: DEMO Airport A\n   Arrival: DEMO Airport B\n   Status: Scheduled"
+            )
+            collected["hotel_results"] = (
+                "1. **Demo Hotel**\n   https://example.com/hotel\n   A comfortable demo stay in the city center."
+            )
+            collected["itinerary"] = (
+                "Day 1: Arrival and city tour\nDay 2: Local experiences\nDay 3: Departure"
+            )
+            collected["final_response"] = (
+                "Demo travel plan: 3-day sample itinerary including flights and hotels."
+            )
+            collected["llm_calls"] = 0
+
+            st.markdown(f"<div class='sec-head'><span>🤖 Agent Pipeline — Demo</span></div>", unsafe_allow_html=True)
+            for node_name in ["flight_agent", "hotel_agent", "itinerary_agent", "final_agent"]:
+                icon, label = AGENT_META.get(node_name, ("🔧", node_name))
                 with st.status(f"{icon}  {label}", state="complete", expanded=True):
                     if node_name == "flight_agent":
-                        text = state_update.get("flight_results", "")
-                        collected["flight_results"] = text
-                        st.markdown(text or "_No flight options found._")
-
+                        st.markdown(collected["flight_results"]) 
                     elif node_name == "hotel_agent":
-                        text = state_update.get("hotel_results", "")
-                        collected["hotel_results"] = text
-                        st.markdown(text or "_No accommodations discovered._")
-
+                        st.markdown(collected["hotel_results"]) 
                     elif node_name == "itinerary_agent":
-                        text = state_update.get("itinerary", "")
-                        collected["itinerary"] = text
-                        st.markdown(text or "_No routing plan constructed._")
-
+                        st.markdown(collected["itinerary"]) 
                     elif node_name == "final_agent":
-                        msgs = state_update.get("messages", [])
-                        text = msgs[-1].content if msgs else ""
-                        collected["final_response"] = text
-                        st.markdown(text or "_No unified response._")
+                        st.markdown(collected["final_response"]) 
+        else:
+            for chunk in app.stream(
+                {
+                    "messages": [HumanMessage(content=user_query)],
+                    "user_query": user_query,
+                    "flight_results": "",
+                    "hotel_results": "",
+                    "itinerary": "",
+                    "llm_calls": 0,
+                },
+                config=config,
+                stream_mode="updates",
+            ):
+                for node_name, state_update in chunk.items():
+                    icon, label = AGENT_META.get(node_name, ("🔧", node_name))
 
-                    collected["llm_calls"] = state_update.get("llm_calls", collected["llm_calls"])
+                    with st.status(f"{icon}  {label}", state="complete", expanded=True):
+                        if node_name == "flight_agent":
+                            text = state_update.get("flight_results", "")
+                            collected["flight_results"] = text
+                            st.markdown(text or "_No flight options found._")
+
+                        elif node_name == "hotel_agent":
+                            text = state_update.get("hotel_results", "")
+                            collected["hotel_results"] = text
+                            st.markdown(text or "_No accommodations discovered._")
+
+                        elif node_name == "itinerary_agent":
+                            text = state_update.get("itinerary", "")
+                            collected["itinerary"] = text
+                            st.markdown(text or "_No routing plan constructed._")
+
+                        elif node_name == "final_agent":
+                            msgs = state_update.get("messages", [])
+                            text = msgs[-1].content if msgs else ""
+                            collected["final_response"] = text
+                            st.markdown(text or "_No unified response._")
+
+                        collected["llm_calls"] = state_update.get("llm_calls", collected["llm_calls"])
 
         # Display Live Performance Metrics
         st.markdown(f"""
