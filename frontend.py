@@ -496,5 +496,5 @@ if st.button("Generate travel plan"):
         result = build_travel_plan(user_query, thread_id="frontend_user")
 
     st.subheader("Final plan")
-    st.write(result.get("final_response", ""))
-    st.info("Set ENABLE_LLM=true and DEMO_MODE=false to use live LLM output.")
+    st.markdown(result.get("final_response", "").replace("\n", "\n\n"))
+    st.info("Live LLM output can be enabled later by setting ENABLE_LLM=true and DEMO_MODE=false.")

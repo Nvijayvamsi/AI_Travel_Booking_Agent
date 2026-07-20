@@ -74,7 +74,24 @@ def hotel_agent(state: TravelState):
 
 def _llm_response(prompt: str):
     if llm is None:
-        return AIMessage(content="Demo travel plan: a short, practical itinerary with simple flight and hotel suggestions.")
+        destination = "your destination"
+        if "tokyo" in prompt.lower():
+            destination = "Tokyo"
+        elif "paris" in prompt.lower():
+            destination = "Paris"
+        elif "dubai" in prompt.lower():
+            destination = "Dubai"
+        elif "kerala" in prompt.lower():
+            destination = "Kerala"
+
+        fallback = (
+            f"Demo travel plan for {destination}:\n"
+            f"- Day 1: Arrive, check in, and explore the city center.\n"
+            f"- Day 2: Visit local landmarks, food spots, and a cultural attraction.\n"
+            f"- Day 3: Enjoy a relaxed final day with shopping or a scenic activity.\n"
+            f"Suggested stay: a central hotel with easy transport access."
+        )
+        return AIMessage(content=fallback)
     response = llm.invoke([
         SystemMessage(content="You are an expert travel planner."),
         HumanMessage(content=prompt),
