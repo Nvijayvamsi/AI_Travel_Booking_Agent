@@ -1,4 +1,5 @@
 import os
+import sys
 from typing import Annotated, TypedDict
 import operator
 
@@ -23,12 +24,14 @@ except Exception:  # pragma: no cover
 from tools.tavily_tool import tavily_search
 from tools.flight_tool import search_flights
 
-DEMO_MODE = os.getenv("DEMO_MODE", "false").strip().lower() in {"1", "true", "yes", "on"}
+DEMO_MODE = os.getenv("DEMO_MODE", "true").strip().lower() in {"1", "true", "yes", "on"}
+ENABLE_LLM = os.getenv("ENABLE_LLM", "false").strip().lower() in {"1", "true", "yes", "on"}
+USE_LLM = ENABLE_LLM and not DEMO_MODE
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 
 def create_llm():
-    if DEMO_MODE or ChatGroq is None:
+    if DEMO_MODE or not USE_LLM or ChatGroq is None:
         return None
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
@@ -71,7 +74,7 @@ def hotel_agent(state: TravelState):
 
 def _llm_response(prompt: str):
     if llm is None:
-        return AIMessage(content="Demo travel plan: a polished itinerary overview with suggested flights and hotels based on your preferences.")
+        return AIMessage(content="Demo travel plan: a short, practical itinerary with simple flight and hotel suggestions.")
     response = llm.invoke([
         SystemMessage(content="You are an expert travel planner."),
         HumanMessage(content=prompt),
@@ -162,8 +165,30 @@ def build_travel_plan(user_query: str, thread_id: str = "demo_user"):
     return result
 
 
+def run_streamlit_app():
+    import streamlit as st
+
+    st.set_page_config(page_title="AI Travel Booking System", page_icon="✈️", layout="wide")
+    st.title("AI Travel Booking System")
+    st.caption("This deployment uses a low-token demo path so it stays fast and stable.")
+
+    user_query = st.text_area("Trip request", value="Plan a 3-day trip to Tokyo", height=120)
+    if st.button("Generate travel plan"):
+        with st.spinner("Planning your trip..."):
+            result = build_travel_plan(user_query, thread_id="streamlit_user")
+        st.subheader("Final plan")
+        st.write(result.get("final_response", ""))
+        st.info("Set ENABLE_LLM=true and DEMO_MODE=false to use live LLM output.")
+
+
 if __name__ == "__main__":
-    user_input = input("Enter travel request: ").strip() or "Plan a 5-day trip to Tokyo"
-    result = build_travel_plan(user_input)
-    print("\nFINAL RESPONSE:\n")
-    print(result.get("final_response", ""))
+    if os.getenv("STREAMLIT_SERVER_PORT") or os.getenv("STREAMLIT_BROWSER_GATHER_USAGE_STATS") is not None:
+        run_streamlit_app()
+    elif sys.stdin.isatty():
+        user_input = input("Enter travel request: ").strip() or "Plan a 5-day trip to Tokyo"
+        result = build_travel_plan(user_input)
+        print("\nFINAL RESPONSE:\n")
+        print(result.get("final_response", ""))
+    else:
+        result = build_travel_plan("Plan a 5-day trip to Tokyo")
+        print(result.get("final_response", ""))
