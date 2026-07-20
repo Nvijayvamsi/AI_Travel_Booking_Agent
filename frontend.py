@@ -496,5 +496,13 @@ if st.button("Generate travel plan"):
         result = build_travel_plan(user_query, thread_id="frontend_user")
 
     st.subheader("Final plan")
-    st.markdown(result.get("final_response", "").replace("\n", "\n\n"))
+    plan_text = result.get("final_response", "")
+    lines = [line.strip() for line in plan_text.splitlines() if line.strip()]
+    if lines:
+        st.markdown(f"### {lines[0]}")
+        for line in lines[1:]:
+            if line.startswith("- "):
+                st.markdown(f"- {line[2:]}")
+            else:
+                st.markdown(line)
     st.info("Live LLM output can be enabled later by setting ENABLE_LLM=true and DEMO_MODE=false.")
